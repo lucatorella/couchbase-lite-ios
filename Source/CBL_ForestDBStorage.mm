@@ -195,7 +195,7 @@ static void onCompactCallback(void *context, bool compacting) {
     // Re-key the views!
     NSArray* viewNames = self.allViewNames;
     for (NSString* viewName in viewNames) {
-        CBL_ForestDBViewStorage* viewStorage = [self viewStorageNamed: viewName create: YES];
+        CBL_ForestDBViewStorage* viewStorage = (CBL_ForestDBViewStorage*)[self viewStorageNamed: viewName create: YES];
         [action addAction: [viewStorage actionToChangeEncryptionKey]];
     }
 
