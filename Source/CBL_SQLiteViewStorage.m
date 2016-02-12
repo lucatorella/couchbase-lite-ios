@@ -602,6 +602,30 @@ static NSString* viewNames(NSArray* views) {
 #pragma mark - QUERYING:
 
 
+/** Main internal call to query a view. */
+- (CBLQueryIteratorBlock) queryWithOptions: (CBLQueryOptions*)options
+                                    status: (CBLStatus*)outStatus
+{
+    if (options.fullTextQuery)
+        return [self fullTextQueryWithOptions: options status: outStatus];
+    else if ([self groupOrReduceWithOptions: options])
+        return [self reducedQueryWithOptions: options status: outStatus];
+    else
+        return [self regularQueryWithOptions: options status: outStatus];
+}
+
+
+// Should this query be run as grouped/reduced?
+- (BOOL) groupOrReduceWithOptions: (CBLQueryOptions*) options {
+    if (options->group || options->groupLevel > 0)
+        return YES;
+    else if (options->reduceSpecified)
+        return options->reduce;
+    else
+        return (_delegate.reduceBlock != nil); // Reduce defaults to true iff there's a reduce block
+}
+
+
 typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString* docID,
                                    CBL_FMResultSet* r);
 

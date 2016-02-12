@@ -437,8 +437,8 @@ static NSString* keyToJSONStr(id key) { // only used for logging
 #pragma mark - QUERYING:
 
 
-- (CBLQueryIteratorBlock) regularQueryWithOptions: (CBLQueryOptions*)options
-                                           status: (CBLStatus*)outStatus
+- (CBLQueryIteratorBlock) queryWithOptions: (CBLQueryOptions*)options
+                                    status: (CBLStatus*)outStatus
 {
     if (![self openIndex: outStatus])
         return nil;
@@ -458,20 +458,8 @@ static NSString* keyToJSONStr(id key) { // only used for logging
     };
 }
 
-- (CBLQueryIteratorBlock) fullTextQueryWithOptions: (CBLQueryOptions*)options
-                                            status: (CBLStatus*)outStatus
-{
-    return [self regularQueryWithOptions: options status: outStatus];
-}
 
-- (CBLQueryIteratorBlock) reducedQueryWithOptions: (CBLQueryOptions*)options
-                                           status: (CBLStatus*)outStatus
-{
-    return [self regularQueryWithOptions: options status: outStatus];
-}
-
-
-#pragma mark - CBL_QueryRowStorage API:
+// CBL_QueryRowStorage API:
 
 
 - (id<CBL_QueryRowStorage>) storageForQueryRow: (CBLQueryRow*)row {

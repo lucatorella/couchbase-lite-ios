@@ -49,17 +49,9 @@
     @return  The success/error status. */
 - (CBLStatus) updateIndexes: (NSArray*)views; // array of CBL_ViewStorage
 
-/** Queries the view without performing any reducing or grouping. */
-- (CBLQueryIteratorBlock) regularQueryWithOptions: (CBLQueryOptions*)options
-                                           status: (CBLStatus*)outStatus;
-
-/** Queries the view, with reducing or grouping as per the options. */
-- (CBLQueryIteratorBlock) reducedQueryWithOptions: (CBLQueryOptions*)options
-                                           status: (CBLStatus*)outStatus;
-
-/** Performs a full-text query as per the options. */
-- (CBLQueryIteratorBlock) fullTextQueryWithOptions: (CBLQueryOptions*)options
-                                            status: (CBLStatus*)outStatus;
+/** Queries the view. */
+- (CBLQueryIteratorBlock) queryWithOptions: (CBLQueryOptions*)options
+                                    status: (CBLStatus*)outStatus;
 
 - (id<CBL_QueryRowStorage>) storageForQueryRow: (CBLQueryRow*)row;
 
