@@ -355,17 +355,17 @@ static id<CBLViewCompiler> sCompiler;
 
 
 /** Main internal call to query a view. */
-- (CBLQueryIteratorBlock) _queryWithOptions: (CBLQueryOptions*)options
+- (NSEnumerator*) _queryWithOptions: (CBLQueryOptions*)options
                                      status: (CBLStatus*)outStatus
 {
     if (!options)
         options = [CBLQueryOptions new];
-    CBLQueryIteratorBlock iterator = [_storage queryWithOptions: options status: outStatus];
-    if (iterator)
+    NSEnumerator* e = [_storage queryWithOptions: options status: outStatus];
+    if (e)
         LogTo(Query, @"Query %@: Returning iterator", _name);
     else
         LogTo(Query, @"Query %@: Failed with status %d", _name, *outStatus);
-    return iterator;
+    return e;
 }
 
 

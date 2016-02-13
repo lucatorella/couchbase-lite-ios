@@ -437,8 +437,8 @@ static NSString* keyToJSONStr(id key) { // only used for logging
 #pragma mark - QUERYING:
 
 
-- (CBLQueryIteratorBlock) queryWithOptions: (CBLQueryOptions*)options
-                                    status: (CBLStatus*)outStatus
+- (NSEnumerator*) queryWithOptions: (CBLQueryOptions*)options
+                            status: (CBLStatus*)outStatus
 {
     if (![self openIndex: outStatus])
         return nil;
@@ -448,14 +448,8 @@ static NSString* keyToJSONStr(id key) { // only used for logging
                                                            C4View: _view
                                                           options: options
                                                             error: &c4err];
-    if (!enumer) {
-        *outStatus = err2status(c4err);
-        return nil;
-    }
-    *outStatus = kCBLStatusOK;
-    return ^CBLQueryRow*() {
-        return [enumer nextObject];
-    };
+    *outStatus = enumer ? kCBLStatusOK : err2status(c4err);
+    return enumer;
 }
 
 

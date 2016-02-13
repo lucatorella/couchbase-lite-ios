@@ -50,8 +50,8 @@
 - (CBLStatus) updateIndexes: (NSArray*)views; // array of CBL_ViewStorage
 
 /** Queries the view. */
-- (CBLQueryIteratorBlock) queryWithOptions: (CBLQueryOptions*)options
-                                    status: (CBLStatus*)outStatus;
+- (NSEnumerator*) queryWithOptions: (CBLQueryOptions*)options
+                            status: (CBLStatus*)outStatus;
 
 - (id<CBL_QueryRowStorage>) storageForQueryRow: (CBLQueryRow*)row;
 

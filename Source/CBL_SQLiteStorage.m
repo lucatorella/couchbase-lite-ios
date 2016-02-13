@@ -1166,8 +1166,8 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
 }
 
 
-- (CBLQueryIteratorBlock) getAllDocs: (CBLQueryOptions*)options
-                              status: (CBLStatus*)outStatus
+- (NSEnumerator*) getAllDocs: (CBLQueryOptions*)options
+                      status: (CBLStatus*)outStatus
 {
     if (!options)
         options = [CBLQueryOptions new];
@@ -1184,7 +1184,7 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
     [sql appendString: @" FROM revs, docs WHERE"];
     if (options.keys) {
         if (options.keys.count == 0)
-            return ^CBLQueryRow*() { return nil; };
+            return @[].objectEnumerator;
         [sql appendFormat: @" revs.doc_id IN (SELECT doc_id FROM docs WHERE docid IN (%@)) AND", CBLJoinSQLQuotedStrings(options.keys)];
         cacheQuery = NO; // we've put hardcoded key strings in the query
     }
@@ -1314,10 +1314,7 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
     }
 
     //OPT: Return objects from enum as they're found, without collecting them in an array first
-    NSEnumerator* rowEnum = rows.objectEnumerator;
-    return ^CBLQueryRow*() {
-        return rowEnum.nextObject;
-    };
+    return rows.objectEnumerator;
 }
 
 

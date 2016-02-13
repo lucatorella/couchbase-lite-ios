@@ -603,8 +603,8 @@ static NSString* viewNames(NSArray* views) {
 
 
 /** Main internal call to query a view. */
-- (CBLQueryIteratorBlock) queryWithOptions: (CBLQueryOptions*)options
-                                    status: (CBLStatus*)outStatus
+- (NSEnumerator*) queryWithOptions: (CBLQueryOptions*)options
+                            status: (CBLStatus*)outStatus
 {
     if (options.fullTextQuery)
         return [self fullTextQueryWithOptions: options status: outStatus];
@@ -769,8 +769,8 @@ typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString*
 }
 
 
-- (CBLQueryIteratorBlock) regularQueryWithOptions: (CBLQueryOptions*)options
-                                           status: (CBLStatus*)outStatus
+- (NSEnumerator*) regularQueryWithOptions: (CBLQueryOptions*)options
+                                   status: (CBLStatus*)outStatus
 {
     CBL_SQLiteStorage* db = _dbStorage;
 
@@ -783,7 +783,7 @@ typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString*
         limit = options->limit;
         skip = options->skip;
         if (limit == 0)
-            return queryIteratorBlockFromArray(nil); // empty result set
+            return [@[] objectEnumerator]; // empty result set
         options->limit = kCBLQueryOptionsDefaultLimit;
         options->skip = 0;
     }
@@ -880,13 +880,13 @@ typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString*
     }
 
     //OPT: Return objects from enum as they're found, without collecting them in an array first
-    return queryIteratorBlockFromArray(rows);
+    return rows.objectEnumerator;
 }
 
 
 /** Runs a full-text query of a view, using the FTS4 table. */
-- (CBLQueryIteratorBlock) fullTextQueryWithOptions: (const CBLQueryOptions*)options
-                                            status: (CBLStatus*)outStatus
+- (NSEnumerator*) fullTextQueryWithOptions: (const CBLQueryOptions*)options
+                                    status: (CBLStatus*)outStatus
 {
     if (![self createFullTextSchema]) {
         *outStatus = kCBLStatusNotImplemented;
@@ -949,7 +949,7 @@ typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString*
     }
 
     //OPT: Return objects from enum as they're found, without collecting them in an array first
-    return queryIteratorBlockFromArray(rows);
+    return rows.objectEnumerator;
 }
 
 
@@ -1026,8 +1026,8 @@ static id callReduce(CBLReduceBlock reduceBlock, NSMutableArray* keys, NSMutable
 }
 
 
-- (CBLQueryIteratorBlock) reducedQueryWithOptions: (CBLQueryOptions*)options
-                                           status: (CBLStatus*)outStatus
+- (NSEnumerator*) reducedQueryWithOptions: (CBLQueryOptions*)options
+                                   status: (CBLStatus*)outStatus
 {
     CBL_SQLiteStorage* db = _dbStorage;
     unsigned groupLevel = options->groupLevel;
@@ -1110,15 +1110,7 @@ static id callReduce(CBLReduceBlock reduceBlock, NSMutableArray* keys, NSMutable
     }
 
     //OPT: Return objects from enum as they're found, without collecting them in an array first
-    return queryIteratorBlockFromArray(rows);
-}
-
-
-static CBLQueryIteratorBlock queryIteratorBlockFromArray(NSArray* rows) {
-    NSEnumerator* rowEnum = rows.objectEnumerator;
-    return ^CBLQueryRow*() {
-        return rowEnum.nextObject;
-    };
+    return rows.objectEnumerator;
 }
 
 
