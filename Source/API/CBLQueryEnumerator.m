@@ -66,6 +66,8 @@
         _view = view;
         _sequenceNumber = sequenceNumber;
         _rows = rows;
+        for (CBLQueryRow* row in rows)
+            [row moveToDatabase: database view: view];
     }
     return self;
 }
@@ -155,7 +157,7 @@
             return nil;
         CBLQueryRow* row = _iterator.nextObject;
         if (row)
-            row.database = _database;
+            [row moveToDatabase: _database view: _view];
         else
             _iterator = nil;
         return row;

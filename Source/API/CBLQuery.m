@@ -195,16 +195,13 @@
         // If using sortDescriptors, have to apply skip+limit later, after sorting
     }
 
+    NSPredicate* postFilter = _postFilter;
     if (_filterBlock) {
         options.filter = _filterBlock;
-    } else if (_postFilter) {
-        NSPredicate* postFilter = _postFilter;
-        CBLDatabase* database = _database;
+    } else if (postFilter) {
         options.filter = ^(CBLQueryRow* row) {
-            row.database = database;    //FIX: What if this is called on another thread??
-            BOOL result = [postFilter evaluateWithObject: row];
-            [row _clearDatabase];
-            return result;
+            Assert(row.database);
+            return [postFilter evaluateWithObject: row];
         };
     }
     return options;
@@ -256,12 +253,9 @@
                                        ifChangedSince: ifChangedSince
                                          lastSequence: &lastSequence
                                                status: &status];
-        NSArray* rows = nil;
-        if (iterator) {
-            // The iterator came from a background thread, so we shouldn't call it on the
-            // original thread. Instead, copy all the rows into an array:
-            rows = iterator.allObjects;
-        }
+        // The iterator came from a background thread, so we shouldn't call it on the
+        // original thread. Instead, copy all the rows into an array:
+        NSArray* rows = iterator.allObjects;
 
         [_database doAsync: ^{
             // Back on original thread, call the onComplete block:
@@ -270,9 +264,6 @@
             NSError* error = nil;
             CBLQueryEnumerator* e = nil;
             if (rows) {
-                // Associate the query rows with this view, not the background-thread one:
-                for (CBLQueryRow* row in rows)
-                    [row moveToDatabase: _database view: _view];
                 e = [[CBLQueryEnumerator alloc] initWithDatabase: _database
                                                             view: _view
                                                   sequenceNumber: lastSequence

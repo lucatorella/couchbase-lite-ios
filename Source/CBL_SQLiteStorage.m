@@ -1173,6 +1173,7 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
         options = [CBLQueryOptions new];
     BOOL includeDocs = (options->includeDocs || options.filter);
     BOOL includeDeletedDocs = (options->allDocsMode == kCBLIncludeDeleted);
+    CBLQueryRowFilter filter = options.filter;
     
     // Generate the SELECT statement, based on the options:
     BOOL cacheQuery = YES;
@@ -1272,11 +1273,10 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
                                                          sequence: sequence
                                                               key: docID
                                                             value: value
-                                                      docRevision: docRevision
-                                                          storage: nil];
+                                                      docRevision: docRevision];
             if (options.keys)
                 docs[docID] = row;
-            else if (!options.filter || options.filter(row))
+            else if (!filter || [self row: row passesFilter: filter])
                 [rows addObject: row];
         }
     }
@@ -1285,8 +1285,8 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
     // If given doc IDs, sort the output into that order, and add entries for missing docs:
     if (options.keys) {
         for (NSString* docID in options.keys) {
-            CBLQueryRow* change = docs[docID];
-            if (!change) {
+            CBLQueryRow* row = docs[docID];
+            if (!row) {
                 // create entry for missing or deleted doc:
                 NSDictionary* value = nil;
                 SInt64 docNumericID = [self getDocNumericID: docID];
@@ -1301,20 +1301,28 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
                     if (revID)
                         value = $dict({@"rev", revID}, {@"deleted", $true});
                 }
-                change = [[CBLQueryRow alloc] initWithDocID: (value ?docID :nil)
+                row = [[CBLQueryRow alloc] initWithDocID: (value ?docID :nil)
                                                    sequence: 0
                                                         key: docID
                                                       value: value
-                                                docRevision: nil
-                                                    storage: nil];
+                                                docRevision: nil];
             }
-            if (!options.filter || options.filter(change))
-                [rows addObject: change];
+            if (!filter || [self row: row passesFilter: filter])
+                [rows addObject: row];
         }
     }
 
     //OPT: Return objects from enum as they're found, without collecting them in an array first
     return rows.objectEnumerator;
+}
+
+
+- (BOOL) row: (CBLQueryRow*)row passesFilter: (CBLQueryRowFilter)filter {
+    [row moveToDatabase: _delegate view: nil];      //FIX: Technically _delgate is not CBLDatabase
+    if (!filter(row))
+        return NO;
+    [row _clearDatabase];
+    return YES;
 }
 
 

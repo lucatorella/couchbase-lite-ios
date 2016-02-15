@@ -792,10 +792,9 @@ static SequenceNumber keyToSequence(id key, SequenceNumber dflt) {
                                                       sequence: seq
                                                            key: rev.docID
                                                          value: value
-                                                   docRevision: rev
-                                                       storage: nil];
+                                                   docRevision: rev];
         if (options.filter) {
-            row.database = self;
+            [row moveToDatabase: self view: nil];
             if (!options.filter(row))
                 continue;
         }

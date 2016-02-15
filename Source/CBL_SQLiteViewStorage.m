@@ -832,19 +832,17 @@ typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString*
                                             boundingBox: bbox
                                             geoJSONData: [r dataForColumn: @"geokey"]
                                                   value: valueData
-                                            docRevision: docRevision
-                                                storage: self];
+                                            docRevision: docRevision];
         } else {
             row = [[CBLQueryRow alloc] initWithDocID: docID
                                             sequence: sequence
                                                  key: keyData
                                                value: valueData
-                                         docRevision: docRevision
-                                             storage: self];
+                                         docRevision: docRevision];
         }
 
         if (filter) {
-            if (!filter(row))
+            if (![self row: row passesFilter: filter])
                 return kCBLStatusOK;
             if (skip > 0) {
                 --skip;
@@ -907,6 +905,7 @@ typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString*
         [sql appendString: @" DESC"];
     [sql appendString: @" LIMIT ? OFFSET ?"];
     int limit = (options->limit != kCBLQueryOptionsDefaultLimit) ? options->limit : -1;
+    CBLQueryRowFilter filter = options.filter;
 
     CBL_SQLiteStorage* dbStorage = _dbStorage;
     CBL_FMResultSet* r = [dbStorage.fmdb executeQuery: [self queryString: sql],
@@ -929,8 +928,7 @@ typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString*
             CBLFullTextQueryRow* row = [[CBLFullTextQueryRow alloc] initWithDocID: docID
                                                                          sequence: sequence
                                                                        fullTextID: fulltextID
-                                                                            value: valueData
-                                                                          storage: self];
+                                                                            value: valueData];
             // Parse the offsets as a space-delimited list of numbers, into an NSArray.
             // (See http://sqlite.org/fts3.html#section_4_1 )
             NSArray* offsets = [[r stringForColumnIndex: 4] componentsSeparatedByString: @" "];
@@ -943,13 +941,23 @@ typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString*
 
             if (options->fullTextSnippets)
                 row.snippet = [r stringForColumnIndex: 5];
-            if (!options.filter || options.filter(row))
+            if (!filter || [self row: row passesFilter: filter])
                 [rows addObject: row];
         }
     }
 
     //OPT: Return objects from enum as they're found, without collecting them in an array first
     return rows.objectEnumerator;
+}
+
+
+- (BOOL) row: (CBLQueryRow*)row passesFilter: (CBLQueryRowFilter)filter {
+    //FIX: I'm not supposed to know the delegates' real classes...
+    [row moveToDatabase: _dbStorage.delegate view: _delegate];
+    if (!filter(row))
+        return NO;
+    [row _clearDatabase];
+    return YES;
 }
 
 
@@ -1030,6 +1038,7 @@ static id callReduce(CBLReduceBlock reduceBlock, NSMutableArray* keys, NSMutable
                                    status: (CBLStatus*)outStatus
 {
     CBL_SQLiteStorage* db = _dbStorage;
+    CBLQueryRowFilter filter = options.filter;
     unsigned groupLevel = options->groupLevel;
     bool group = options->group || groupLevel > 0;
     CBLReduceBlock reduce = _delegate.reduceBlock;
@@ -1064,9 +1073,8 @@ static id callReduce(CBLReduceBlock reduceBlock, NSMutableArray* keys, NSMutable
                                                              sequence: 0
                                                                   key: key
                                                                 value: reduced
-                                                          docRevision: nil
-                                                              storage: self];
-                if (!options.filter || options.filter(row))
+                                                          docRevision: nil];
+                if (!filter || [self row: row passesFilter: filter])
                     [rows addObject: row];
                 [keysToReduce removeAllObjects];
                 [valuesToReduce removeAllObjects];
@@ -1103,9 +1111,8 @@ static id callReduce(CBLReduceBlock reduceBlock, NSMutableArray* keys, NSMutable
                                                      sequence: 0
                                                           key: key
                                                         value: reduced
-                                                  docRevision: nil
-                                                      storage: self];
-        if (!options.filter || options.filter(row))
+                                                  docRevision: nil];
+        if (!filter || [self row: row passesFilter: filter])
             [rows addObject: row];
     }
 
