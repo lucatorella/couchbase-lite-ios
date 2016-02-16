@@ -187,7 +187,6 @@
     options->updateSeq = YES;
     options->allDocsMode = _allDocsMode;
     options->indexUpdateMode = _indexUpdateMode;
-    options->indexUpdateMode = _indexUpdateMode;
 
     if (_sortDescriptors.count == 0) {
         options->skip = (unsigned)_skip;
