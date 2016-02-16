@@ -36,7 +36,7 @@ extern "C" {
                          options: (CBLQueryOptions*)options
                            error: (C4Error*)outError
 {
-    self = [super init];
+    self = [super initWithSequenceNumber: c4view_getLastSequenceChangedAt(c4view) rows: nil];
     if (self) {
         _viewStorage = viewStorage;
         _includeDocs = options->includeDocs;
@@ -154,7 +154,7 @@ extern "C" {
 
 
 // Here's the guts of the enumeration:
-- (id) nextObject {
+- (CBLQueryRow*) generateNextRow {
     if (_enum == nil)
         return nil;
     if (_limit-- == 0) {

@@ -1166,8 +1166,8 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
 }
 
 
-- (NSEnumerator*) getAllDocs: (CBLQueryOptions*)options
-                      status: (CBLStatus*)outStatus
+- (CBLQueryEnumerator*) getAllDocs: (CBLQueryOptions*)options
+                            status: (CBLStatus*)outStatus
 {
     if (!options)
         options = [CBLQueryOptions new];
@@ -1184,8 +1184,10 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
         [sql appendString: @", deleted"];
     [sql appendString: @" FROM revs, docs WHERE"];
     if (options.keys) {
-        if (options.keys.count == 0)
-            return @[].objectEnumerator;
+        if (options.keys.count == 0) {
+            *outStatus = kCBLStatusOK;
+            return nil;
+        }
         [sql appendFormat: @" revs.doc_id IN (SELECT doc_id FROM docs WHERE docid IN (%@)) AND", CBLJoinSQLQuotedStrings(options.keys)];
         cacheQuery = NO; // we've put hardcoded key strings in the query
     }
@@ -1219,6 +1221,8 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
                        (includeDeletedDocs ? @"deleted ASC," : @"")];
     [args addObject: @(options->limit)];
     [args addObject: @(options->skip)];
+
+    SequenceNumber lastSeq = self.lastSequence;
     
     // Now run the database query:
     if (!cacheQuery)
@@ -1226,8 +1230,10 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
     CBL_FMResultSet* r = [_fmdb executeQuery: sql withArgumentsInArray: args];
     if (!cacheQuery)
         _fmdb.shouldCacheStatements = YES;
-    if (!r)
+    if (!r) {
+        *outStatus = self.lastDbError;
         return nil;
+    }
     
     NSMutableArray* rows = $marray();
     NSMutableDictionary* docs = options.keys ? $mdict() : nil;
@@ -1313,7 +1319,7 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
     }
 
     //OPT: Return objects from enum as they're found, without collecting them in an array first
-    return rows.objectEnumerator;
+    return [[CBLQueryEnumerator alloc] initWithSequenceNumber: lastSeq rows: rows];
 }
 
 

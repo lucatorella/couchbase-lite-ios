@@ -29,7 +29,7 @@ extern "C" {
                          options: (CBLQueryOptions*)options
                            error: (C4Error*)outError
 {
-    self = [super init];
+    self = [super initWithSequenceNumber: storage.lastSequence rows: nil];
     if (self) {
         _storage = storage;
         C4EnumeratorOptions c4options = {0, 0};
@@ -89,7 +89,7 @@ extern "C" {
 }
 
 
-- (id) nextObject {
+- (CBLQueryRow*) generateNextRow {
     if (!_enum)
         return nil;
     C4Error c4err;

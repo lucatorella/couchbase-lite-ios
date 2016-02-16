@@ -738,12 +738,15 @@ static SequenceNumber keyToSequence(id key, SequenceNumber dflt) {
 }
 
 
-- (NSEnumerator*) getAllDocs: (CBLQueryOptions*)options
-                      status: (CBLStatus*)outStatus
+- (CBLQueryEnumerator*) getAllDocs: (CBLQueryOptions*)options
+                            status: (CBLStatus*)outStatus
 {
     // For regular all-docs, let storage do it all:
-    if (!options || options->allDocsMode != kCBLBySequence)
-        return [_storage getAllDocs: options status: outStatus];
+    if (!options || options->allDocsMode != kCBLBySequence) {
+        CBLQueryEnumerator* e = [_storage getAllDocs: options status: outStatus];
+        [e setDatabase: self view: nil];
+        return e;
+    }
 
     // For changes feed mode (kCBLBySequence) do more work here:
     CBLChangesOptions changesOpts = {
@@ -758,6 +761,7 @@ static SequenceNumber keyToSequence(id key, SequenceNumber dflt) {
         minKey = maxKey;
         maxKey = temp;
     }
+    SequenceNumber lastSeq = self.lastSequenceNumber;
     SequenceNumber minSeq = keyToSequence(minKey, 1);
     SequenceNumber maxSeq = keyToSequence(maxKey, INT64_MAX);
     if (!(options->descending ? options->inclusiveEnd : options->inclusiveStart))
@@ -800,7 +804,11 @@ static SequenceNumber keyToSequence(id key, SequenceNumber dflt) {
         }
         [result addObject: row];
     }
-    return result.objectEnumerator;
+
+    return [[CBLQueryEnumerator alloc] initWithDatabase: self
+                                                   view: nil
+                                         sequenceNumber: lastSeq
+                                                   rows: result];
 }
 
 

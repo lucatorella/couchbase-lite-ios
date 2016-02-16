@@ -30,11 +30,11 @@
 
 // Querying utilities for CBLDatabase. Defined down below.
 @interface CBLDatabase (Views)
-- (NSEnumerator*) queryViewNamed: (NSString*)viewName
-                         options: (CBLQueryOptions*)options
-                  ifChangedSince: (SequenceNumber)ifChangedSince
-                    lastSequence: (SequenceNumber*)outLastSequence
-                          status: (CBLStatus*)outStatus;
+- (CBLQueryEnumerator*) queryViewNamed: (NSString*)viewName
+                               options: (CBLQueryOptions*)options
+                        ifChangedSince: (SequenceNumber)ifChangedSince
+                          lastSequence: (SequenceNumber*)outLastSequence
+                                status: (CBLStatus*)outStatus;
 @end
 
 
@@ -211,23 +211,19 @@
     CBLStatus status;
     LogTo(Query, @"%@: running...", self);
     SequenceNumber lastSequence;
-    NSEnumerator* iterator = [_database queryViewNamed: _view.name
-                                               options: self.queryOptions
-                                        ifChangedSince: -1
-                                          lastSequence: &lastSequence
-                                                status: &status];
-    if (!iterator) {
+    CBLQueryEnumerator* result = [_database queryViewNamed: _view.name
+                                                   options: self.queryOptions
+                                            ifChangedSince: -1
+                                              lastSequence: &lastSequence
+                                                    status: &status];
+    if (result) {
+        if (_sortDescriptors.count > 0)
+            [result sortUsingDescriptors: _sortDescriptors
+                                    skip: _skip
+                                   limit: _limit];
+    } else {
         CBLStatusToOutNSError(status, outError);
-        return nil;
     }
-    CBLQueryEnumerator* result = [[CBLQueryEnumerator alloc] initWithDatabase: _database
-                                                                         view: _view
-                                                               sequenceNumber: lastSequence
-                                                                     iterator: iterator];
-    if (_sortDescriptors.count > 0)
-        [result sortUsingDescriptors: _sortDescriptors
-                                skip: _skip
-                               limit: _limit];
     return result;
 }
 
@@ -247,26 +243,26 @@
         // On the background server thread, run the query:
         CBLStatus status;
         SequenceNumber lastSequence;
-        NSEnumerator* iterator = [bgdb queryViewNamed: viewName
-                                              options: options
-                                       ifChangedSince: ifChangedSince
-                                         lastSequence: &lastSequence
-                                               status: &status];
-        // The iterator came from a background thread, so we shouldn't call it on the
-        // original thread. Instead, copy all the rows into an array:
-        NSArray* rows = iterator.allObjects;
+        CBLQueryEnumerator* e = [bgdb queryViewNamed: viewName
+                                             options: options
+                                      ifChangedSince: ifChangedSince
+                                        lastSequence: &lastSequence
+                                              status: &status];
+        if (e) {
+            // The iterator came from a background thread, so we shouldn't let it generate its rows
+            // on the main thread. Force it to generate all the rows now & buffer them in an array:
+            (void)e.allObjects;
+        } else if (status == kCBLStatusOK) {
+            e = [[CBLQueryEnumerator alloc] initWithSequenceNumber: lastSequence rows: @[]];
+        }
 
         [_database doAsync: ^{
             // Back on original thread, call the onComplete block:
             LogTo(Query, @"%@: ...async query finished (%u rows, status %d)",
-                  self, (unsigned)rows.count, status);
+                  self, (unsigned)e.count, status);
             NSError* error = nil;
-            CBLQueryEnumerator* e = nil;
-            if (rows) {
-                e = [[CBLQueryEnumerator alloc] initWithDatabase: _database
-                                                            view: _view
-                                                  sequenceNumber: lastSequence
-                                                            rows: rows];
+            if (e) {
+                [e setDatabase: _database view: _view];
                 if (_sortDescriptors.count > 0)
                     [e sortUsingDescriptors: _sortDescriptors
                                        skip: _skip
@@ -479,14 +475,14 @@
                 last updated. (Can be NULL.)
     @param outStatus  If the method returns nil, this will be set to a status code.
     @return  An iterator block that returns successive view rows, or nil. */
-- (NSEnumerator*) queryViewNamed: (NSString*)viewName
-                         options: (CBLQueryOptions*)options
-                  ifChangedSince: (SequenceNumber)ifChangedSince
-                    lastSequence: (SequenceNumber*)outLastSequence
-                          status: (CBLStatus*)outStatus
+- (CBLQueryEnumerator*) queryViewNamed: (NSString*)viewName
+                               options: (CBLQueryOptions*)options
+                        ifChangedSince: (SequenceNumber)ifChangedSince
+                          lastSequence: (SequenceNumber*)outLastSequence
+                                status: (CBLStatus*)outStatus
 {
     CBLStatus status = kCBLStatusOK;
-    NSEnumerator* e = nil;
+    CBLQueryEnumerator* e = nil;
     SequenceNumber lastIndexedSequence = 0, lastChangedSequence = 0;
     do {
         if (viewName) {
