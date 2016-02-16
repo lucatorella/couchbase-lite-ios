@@ -1169,8 +1169,7 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
 - (CBLQueryEnumerator*) getAllDocs: (CBLQueryOptions*)options
                             status: (CBLStatus*)outStatus
 {
-    if (!options)
-        options = [CBLQueryOptions new];
+    SequenceNumber lastSeq = self.lastSequence;
     BOOL includeDocs = (options->includeDocs || options.filter);
     BOOL includeDeletedDocs = (options->allDocsMode == kCBLIncludeDeleted);
     CBLQueryRowFilter filter = options.filter;
@@ -1184,10 +1183,6 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
         [sql appendString: @", deleted"];
     [sql appendString: @" FROM revs, docs WHERE"];
     if (options.keys) {
-        if (options.keys.count == 0) {
-            *outStatus = kCBLStatusOK;
-            return nil;
-        }
         [sql appendFormat: @" revs.doc_id IN (SELECT doc_id FROM docs WHERE docid IN (%@)) AND", CBLJoinSQLQuotedStrings(options.keys)];
         cacheQuery = NO; // we've put hardcoded key strings in the query
     }
@@ -1196,13 +1191,11 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
         [sql appendString: @" AND deleted=0"];
 
     NSMutableArray* args = $marray();
-    id minKey = options.startKey, maxKey = options.endKey;
-    BOOL inclusiveMin = YES, inclusiveMax = options->inclusiveEnd;
+    id minKey = options.minKey, maxKey = options.maxKey;
+    BOOL inclusiveMin = options->inclusiveStart, inclusiveMax = options->inclusiveEnd;
     if (options->descending) {
-        minKey = maxKey;
-        maxKey = options.startKey;
-        inclusiveMin = inclusiveMax;
-        inclusiveMax = YES;
+        inclusiveMin = options->inclusiveEnd;
+        inclusiveMax = options->inclusiveStart;
     }
     if (minKey) {
         Assert([minKey isKindOfClass: [NSString class]]);
@@ -1211,7 +1204,6 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
     }
     if (maxKey) {
         Assert([maxKey isKindOfClass: [NSString class]]);
-        maxKey = CBLKeyForPrefixMatch(maxKey, options->prefixMatchLevel);
         [sql appendString: (inclusiveMax ? @" AND docid <= ?" :  @" AND docid < ?")];
         [args addObject: maxKey];
     }
@@ -1222,8 +1214,6 @@ NSString* CBLJoinSQLQuotedStrings(NSArray* strings) {
     [args addObject: @(options->limit)];
     [args addObject: @(options->skip)];
 
-    SequenceNumber lastSeq = self.lastSequence;
-    
     // Now run the database query:
     if (!cacheQuery)
         _fmdb.shouldCacheStatements = NO;

@@ -741,37 +741,44 @@ static SequenceNumber keyToSequence(id key, SequenceNumber dflt) {
 - (CBLQueryEnumerator*) getAllDocs: (CBLQueryOptions*)options
                             status: (CBLStatus*)outStatus
 {
+    if (!options)
+        options = [CBLQueryOptions new];
+    else if (options.isEmpty)
+        return [[CBLQueryEnumerator alloc] initWithDatabase: self
+                                                       view: nil
+                                             sequenceNumber: self.lastSequenceNumber
+                                                       rows: nil];
+
     // For regular all-docs, let storage do it all:
-    if (!options || options->allDocsMode != kCBLBySequence) {
+    if (options->allDocsMode != kCBLBySequence) {
         CBLQueryEnumerator* e = [_storage getAllDocs: options status: outStatus];
         [e setDatabase: self view: nil];
         return e;
     }
 
     // For changes feed mode (kCBLBySequence) do more work here:
+    SequenceNumber lastSeq = _storage.lastSequence;
+    SequenceNumber minSeq = keyToSequence(options.minKey, 1);
+    SequenceNumber maxSeq = keyToSequence(options.maxKey, INT64_MAX);
+    if (!(options->descending ? options->inclusiveEnd : options->inclusiveStart))
+        ++minSeq;
+    if (!(options->descending ? options->inclusiveStart : options->inclusiveEnd))
+        --maxSeq;
+    if (minSeq > maxSeq || minSeq > lastSeq) {
+        // Empty result:
+        *outStatus = kCBLStatusOK;
+        return [[CBLQueryEnumerator alloc] initWithDatabase: self
+                                                       view: nil
+                                             sequenceNumber: lastSeq
+                                                       rows: nil];
+    }
+
     CBLChangesOptions changesOpts = {
         .limit = options->limit,
         .includeDocs = options->includeDocs,
         .includeConflicts = YES,
         .sortBySequence = YES
     };
-    id minKey = options.startKey, maxKey = options.endKey;
-    if (options->descending) {
-        id temp = minKey;
-        minKey = maxKey;
-        maxKey = temp;
-    }
-    SequenceNumber lastSeq = self.lastSequenceNumber;
-    SequenceNumber minSeq = keyToSequence(minKey, 1);
-    SequenceNumber maxSeq = keyToSequence(maxKey, INT64_MAX);
-    if (!(options->descending ? options->inclusiveEnd : options->inclusiveStart))
-        ++minSeq;
-    if (!(options->descending ? options->inclusiveStart : options->inclusiveEnd))
-        --maxSeq;
-    if (minSeq > maxSeq) {
-        *outStatus = kCBLStatusOK;
-        return nil;  // empty result
-    }
     CBL_RevisionList* revs = [_storage changesSinceSequence: minSeq - 1
                                                     options: &changesOpts
                                                      filter: nil

@@ -33,7 +33,6 @@
 - (CBLQueryEnumerator*) queryViewNamed: (NSString*)viewName
                                options: (CBLQueryOptions*)options
                         ifChangedSince: (SequenceNumber)ifChangedSince
-                          lastSequence: (SequenceNumber*)outLastSequence
                                 status: (CBLStatus*)outStatus;
 @end
 
@@ -210,12 +209,10 @@
 - (CBLQueryEnumerator*) run: (NSError**)outError {
     CBLStatus status;
     LogTo(Query, @"%@: running...", self);
-    SequenceNumber lastSequence;
     CBLQueryEnumerator* result = [_database queryViewNamed: _view.name
-                                                   options: self.queryOptions
-                                            ifChangedSince: -1
-                                              lastSequence: &lastSequence
-                                                    status: &status];
+                                                     options: self.queryOptions
+                                              ifChangedSince: -1
+                                                      status: &status];
     if (result) {
         if (_sortDescriptors.count > 0)
             [result sortUsingDescriptors: _sortDescriptors
@@ -242,19 +239,13 @@
     [_database.manager backgroundTellDatabaseNamed: _database.name to: ^(CBLDatabase *bgdb) {
         // On the background server thread, run the query:
         CBLStatus status;
-        SequenceNumber lastSequence;
         CBLQueryEnumerator* e = [bgdb queryViewNamed: viewName
                                              options: options
                                       ifChangedSince: ifChangedSince
-                                        lastSequence: &lastSequence
                                               status: &status];
-        if (e) {
-            // The iterator came from a background thread, so we shouldn't let it generate its rows
-            // on the main thread. Force it to generate all the rows now & buffer them in an array:
-            (void)e.allObjects;
-        } else if (status == kCBLStatusOK) {
-            e = [[CBLQueryEnumerator alloc] initWithSequenceNumber: lastSequence rows: @[]];
-        }
+        // The iterator came from a background thread, so we shouldn't let it generate its rows
+        // on the main thread. Force it to generate all the rows now & buffer them in an array:
+        (void)e.allObjects;
 
         [_database doAsync: ^{
             // Back on original thread, call the onComplete block:
@@ -471,14 +462,11 @@
     @param options  The query options.
     @param ifChangedSince  If the view index (or database) hasn't changed since this sequence,
                 the method will return nil and kCBLStatusNotModified. (Pass -1 to bypass this.)
-    @param outLastSequence  On return will be set to the sequence at which the view's index was
-                last updated. (Can be NULL.)
     @param outStatus  If the method returns nil, this will be set to a status code.
-    @return  An iterator block that returns successive view rows, or nil. */
+    @return  An enumerator that returns successive view rows, or nil. */
 - (CBLQueryEnumerator*) queryViewNamed: (NSString*)viewName
                                options: (CBLQueryOptions*)options
                         ifChangedSince: (SequenceNumber)ifChangedSince
-                          lastSequence: (SequenceNumber*)outLastSequence
                                 status: (CBLStatus*)outStatus
 {
     CBLStatus status = kCBLStatusOK;
@@ -520,10 +508,7 @@
         }
     } while(false); // just to allow 'break' within the block
 
-    if (outLastSequence)
-        *outLastSequence = lastIndexedSequence;
-    if (outStatus)
-        *outStatus = status;
+    *outStatus = status;
     return e;
 }
 

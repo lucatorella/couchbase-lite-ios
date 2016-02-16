@@ -55,7 +55,8 @@
                              rows: (NSArray*)rows
 {
     NSParameterAssert(database);
-    self = [self initWithSequenceNumber: sequenceNumber rows: rows];
+    self = [self initWithSequenceNumber: sequenceNumber
+                                   rows: (rows ?: @[])];
     if (self ) {
         _database = database;
         _view = view;

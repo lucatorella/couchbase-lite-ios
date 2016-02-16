@@ -641,9 +641,6 @@ typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString*
 - (CBLStatus) _runQueryWithOptions: (const CBLQueryOptions*)options
                              onRow: (QueryRowBlock)onRow
 {
-    if (!options)
-        options = [CBLQueryOptions new];
-
     // OPT: It would be faster to use separate tables for raw-or ascii-collated views so that
     // they could be indexed with the right collation, instead of having to specify it here.
     NSString* collationStr = @"";
@@ -678,13 +675,11 @@ typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString*
         [sql appendString:@")"];
     }
 
-    id minKey = options.startKey, maxKey = options.endKey;
+    id minKey = options.minKey, maxKey = options.maxKey;
     NSString* minKeyDocID = options.startKeyDocID;
     NSString* maxKeyDocID = options.endKeyDocID;
     BOOL inclusiveMin = options->inclusiveStart, inclusiveMax = options->inclusiveEnd;
     if (options->descending) {
-        minKey = options.endKey;
-        maxKey = options.startKey;
         inclusiveMin = options->inclusiveEnd;
         inclusiveMax = options->inclusiveStart;
         minKeyDocID = options.endKeyDocID;
@@ -704,7 +699,6 @@ typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString*
         }
     }
     if (maxKey) {
-        maxKey = CBLKeyForPrefixMatch(maxKey, options->prefixMatchLevel);
         NSData* maxKeyData = toJSONData(maxKey);
         [sql appendString: (inclusiveMax ? @" AND key <= ?" :  @" AND key < ?")];
         [sql appendString: collationStr];
@@ -789,10 +783,6 @@ typedef CBLStatus (^QueryRowBlock)(NSData* keyData, NSData* valueData, NSString*
         // underlying query, so handle them specially:
         limit = options->limit;
         skip = options->skip;
-        if (limit == 0) {
-            *outStatus = kCBLStatusOK;
-            return nil; // empty result set
-        }
         options->limit = kCBLQueryOptionsDefaultLimit;
         options->skip = 0;
     }

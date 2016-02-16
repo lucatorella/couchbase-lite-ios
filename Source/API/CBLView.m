@@ -51,6 +51,18 @@ NSString* const kCBLViewChangeNotification = @"CBLViewChange";
     return self;
 }
 
+- (BOOL) isEmpty {
+    return limit == 0 || (keys && keys.count == 0);
+}
+
+- (id) minKey {
+    return descending ? endKey : startKey;
+}
+
+- (id) maxKey {
+    return CBLKeyForPrefixMatch(descending ? startKey : endKey, prefixMatchLevel);
+}
+
 @end
 
 
@@ -360,6 +372,12 @@ static id<CBLViewCompiler> sCompiler;
 {
     if (!options)
         options = [CBLQueryOptions new];
+    else if (options.isEmpty)
+        return [[CBLQueryEnumerator alloc] initWithDatabase: self.database
+                                                       view: self
+                                             sequenceNumber: self.lastSequenceIndexed
+                                                       rows: nil];
+
     CBLQueryEnumerator* e = [_storage queryWithOptions: options status: outStatus];
     [e setDatabase: self.database view: self];
     if (e)

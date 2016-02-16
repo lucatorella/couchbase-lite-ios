@@ -568,9 +568,6 @@ static CBLStatus selectRev(C4Document* doc, NSString* revID, BOOL withBody) {
 - (CBLQueryEnumerator*) getAllDocs: (CBLQueryOptions*)options
                             status: (CBLStatus*)outStatus
 {
-    if (!options)
-        options = [CBLQueryOptions new];
-
     C4Error c4err;
     CBL_ForestDBDocEnumerator* e = [[CBL_ForestDBDocEnumerator alloc] initWithStorage: self
                                                                               options: options
