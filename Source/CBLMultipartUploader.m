@@ -46,7 +46,9 @@
     SInt64 length = _currentWriter.length;
     Assert(length >= 0, @"HTTP multipart upload body has indeterminate length");
     [_request setValue: $sprintf(@"%lld", length) forHTTPHeaderField: @"Content-Length"];
-
+    // Set Expect header to preflight the request to see if there is an immediate error such as
+    // 401 error before sending the message body (#1124):
+    [_request setValue: @"100-continue" forHTTPHeaderField: @"Expect"];
     [_currentWriter openForURLRequest: _request];
     return [super createTaskInURLSession: session];
 }

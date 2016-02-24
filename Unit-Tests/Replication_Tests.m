@@ -1372,5 +1372,32 @@ static UInt8 sEncryptionIV[kCCBlockSizeAES128];
     AssertEq(db.allReplications.count, 0u);
 }
 
+- (void) test_24_AttachmentPushWithBasicAuth {
+    NSURL* remoteDbURL = [self remoteTestDBURL: @"cbl_auth_test"];
+    if (!remoteDbURL)
+        return;
+    [self eraseRemoteDB: remoteDbURL];
+
+    CBLDocument* doc = [db createDocument];
+    [doc putProperties:@{@"foo": @"bar"} error:nil];
+
+    NSInteger size = 500 * 1024;
+    unsigned char attachbytes[size];
+    for(int i=0; i<size; i++) {
+        attachbytes[i] = 1;
+    }
+    NSData* attach1 = [NSData dataWithBytes:attachbytes length:size];
+    CBLUnsavedRevision *rev2 = [doc.currentRevision createRevision];
+    [rev2 setAttachmentNamed: @"attach" withContentType: @"text/plain" content:attach1];
+    [rev2 save:nil];
+
+    CBLReplication* repl = [db createPushReplication: remoteDbURL];
+    repl.continuous = YES;
+    repl.authenticator = [CBLAuthenticator basicAuthenticatorWithName: @"test"
+                                                             password: @"abc123"];
+
+    [self runReplication: repl expectedChangesCount: 1u];
+}
+
 
 @end
